@@ -34,7 +34,6 @@ outputs/processed/beat_features.csv
 outputs/metrics.json
 outputs/figures/growth_to_intensity.png
 outputs/figures/leaf_to_register.png
-outputs/figures/harmony_to_accompaniment.png
 ```
 
 ## Pipeline
@@ -110,13 +109,12 @@ If they are unavailable, `render.py` falls back to a simple internal synth so th
 
 ## Visualization
 
-The final visualization set is intentionally small. Each figure pairs a data-side idea with its musical translation:
+The final visualization set is intentionally small. Each figure pairs a data-side idea with its musical translation while preserving `R1`, `R2`, and `R3` separately:
 
 | Figure | Correspondence |
 |---|---|
-| `growth_to_intensity.png` | `growth_speed`/`vitality` to musical density/velocity |
-| `leaf_to_register.png` | `leaf_energy` to melodic register |
-| `harmony_to_accompaniment.png` | harmony plan to broken-chord accompaniment texture |
+| `growth_to_intensity.png` | Per-batch `growth_speed`/`vitality` to same-batch melody density/velocity |
+| `leaf_to_register.png` | Per-batch `leaf_energy` to same-batch melodic register |
 
 These are presentation figures, not exhaustive debugging plots.
 

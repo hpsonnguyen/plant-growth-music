@@ -63,8 +63,8 @@
     "settling": 15.333
   },
   "correlations": {
-    "vitality_vs_velocity": 0.8098299615404501,
-    "growth_speed_vs_note_density": 0.6376535349251737,
-    "leaf_energy_vs_pitch_register": 0.18899470915714714
+    "vitality_vs_velocity": 0.8098299615404498,
+    "growth_speed_vs_note_density": 0.6376535349251738,
+    "leaf_energy_vs_pitch_register": 0.18899470915714703
   }
 }

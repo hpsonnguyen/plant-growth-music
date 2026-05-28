@@ -11,8 +11,9 @@ from .config import output_path
 SHOWCASE_FIGURES = {
     "growth_to_intensity.png",
     "leaf_to_register.png",
-    "harmony_to_accompaniment.png",
 }
+
+BATCH_COLORS = {"R1": "#355c7d", "R2": "#2a9d8f", "R3": "#e76f51"}
 
 
 def _try_matplotlib():
@@ -34,8 +35,6 @@ def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFra
         _set_style(plt)
         _plot_growth_to_intensity(plt, figures, features, events)
         _plot_leaf_to_register(plt, figures, features, events)
-        if harmony_plan is not None and not harmony_plan.empty:
-            _plot_harmony_to_accompaniment(plt, figures, events, harmony_plan)
     _write_metrics(config, features, events)
 
 
@@ -57,6 +56,7 @@ def _remove_old_figures(figures) -> None:
     stale = [
         "growth_signals.png", "piano_roll.png", "pitch_vs_growth.png", "velocity_density.png",
         "stem_comparison.png", "harmony_timeline.png", "chord_piano_roll.png", "melody_chord_fit.png",
+        "harmony_to_accompaniment.png",
         "growth_mass.svg", "leaf_energy.svg", "root_energy.svg", "vitality.svg", "growth_speed.svg",
         "piano_roll.csv", "README.txt",
     ]
@@ -67,101 +67,102 @@ def _remove_old_figures(figures) -> None:
 
 
 def _plot_growth_to_intensity(plt, figures, features: pd.DataFrame, events: pd.DataFrame) -> None:
-    bar_features = features.groupby("bar_index", as_index=False).agg({"growth_speed": "mean", "vitality": "mean"})
-    musical = events.groupby("bar_index", as_index=False).agg(notes=("event_id", "count"), velocity=("velocity", "mean"))
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
-    fig.suptitle("Growth Activity Becomes Musical Intensity", fontsize=18, fontweight="bold", y=1.03)
+    melody = events[events["event_type"] == "melody"]
+    batches = sorted(features["Random"].unique())
+    fig, axes = plt.subplots(len(batches), 2, figsize=(16, 10), sharex="col")
+    fig.suptitle("Growth Activity Becomes Musical Intensity", fontsize=18, fontweight="bold", y=1.01)
 
-    axes[0].plot(bar_features["bar_index"], bar_features["growth_speed"], color="#547d49", linewidth=2.2, label="growth speed")
-    axes[0].plot(bar_features["bar_index"], bar_features["vitality"], color="#9b5f2e", linewidth=2.2, label="vitality")
-    axes[0].fill_between(bar_features["bar_index"], 0, bar_features["growth_speed"], color="#547d49", alpha=0.18)
-    axes[0].set_title("Data: movement and vitality")
-    axes[0].set_xlabel("Bar")
-    axes[0].set_ylabel("Normalized signal")
-    axes[0].set_ylim(0, 1.05)
-    axes[0].legend(frameon=False)
-    axes[0].grid(True, linewidth=0.8)
+    for row_index, batch in enumerate(batches):
+        color = BATCH_COLORS.get(batch, "#355c7d")
+        batch_features = _batch_bar_features(features, batch, ["growth_speed", "vitality"])
+        batch_music = _batch_bar_music(melody, batch)
+        ax_data = axes[row_index, 0]
+        ax_music = axes[row_index, 1]
 
-    axes[1].bar(musical["bar_index"], musical["notes"], color="#315f72", alpha=0.72, label="events per bar")
-    ax2 = axes[1].twinx()
-    ax2.plot(musical["bar_index"], musical["velocity"], color="#c86444", linewidth=2.2, label="mean velocity")
-    axes[1].set_title("Music: density and dynamic force")
-    axes[1].set_xlabel("Bar")
-    axes[1].set_ylabel("Events per bar")
-    ax2.set_ylabel("Mean MIDI velocity")
-    axes[1].grid(True, axis="y", linewidth=0.8)
-    lines, labels = axes[1].get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    axes[1].legend(lines + lines2, labels + labels2, frameon=False, loc="upper left")
+        ax_data.plot(batch_features["bar_index"], batch_features["growth_speed"], color=color, linewidth=2.2, label="growth speed")
+        ax_data.plot(batch_features["bar_index"], batch_features["vitality"], color="#9b5f2e", linewidth=1.8, alpha=0.88, label="vitality")
+        ax_data.fill_between(batch_features["bar_index"], 0, batch_features["growth_speed"], color=color, alpha=0.18)
+        ax_data.set_ylabel(f"{batch}\nData")
+        ax_data.set_ylim(0, 1.05)
+        ax_data.grid(True, linewidth=0.8)
+        if row_index == 0:
+            ax_data.set_title("Data: activity and force by batch")
+            ax_data.legend(frameon=False, loc="upper left")
 
+        ax_music.bar(batch_music["bar_index"], batch_music["notes"], color=color, alpha=0.55, label="melody notes/bar")
+        ax_velocity = ax_music.twinx()
+        ax_velocity.plot(batch_music["bar_index"], batch_music["velocity"], color="#c86444", linewidth=2.0, label="mean velocity")
+        ax_music.set_ylabel("Notes")
+        ax_velocity.set_ylabel("Velocity")
+        ax_music.grid(True, axis="y", linewidth=0.8)
+        if row_index == 0:
+            ax_music.set_title("Music: melody density and dynamic response")
+            lines, labels = ax_music.get_legend_handles_labels()
+            lines2, labels2 = ax_velocity.get_legend_handles_labels()
+            ax_music.legend(lines + lines2, labels + labels2, frameon=False, loc="upper left")
+    axes[-1, 0].set_xlabel("Bar")
+    axes[-1, 1].set_xlabel("Bar")
     _shade_sections(config=None, axes=axes)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(figures / "growth_to_intensity.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 
 def _plot_leaf_to_register(plt, figures, features: pd.DataFrame, events: pd.DataFrame) -> None:
-    melody = events[events["event_type"].isin(["melody", "resolution"])].copy()
-    bar_leaf = features.groupby("bar_index", as_index=False)["leaf_energy"].mean()
-    melody_bar = melody.groupby("bar_index", as_index=False).agg(pitch=("pitch_midi", "mean"))
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
-    fig.suptitle("Leaf Energy Opens The Register", fontsize=18, fontweight="bold", y=1.03)
+    melody = events[events["event_type"] == "melody"].copy()
+    batches = sorted(features["Random"].unique())
+    fig, axes = plt.subplots(len(batches), 2, figsize=(16, 10), sharex="col")
+    fig.suptitle("Leaf Energy Opens Register", fontsize=18, fontweight="bold", y=1.01)
 
-    axes[0].plot(bar_leaf["bar_index"], bar_leaf["leaf_energy"], color="#4c8c71", linewidth=2.4)
-    axes[0].fill_between(bar_leaf["bar_index"], 0, bar_leaf["leaf_energy"], color="#4c8c71", alpha=0.2)
-    axes[0].set_title("Data: leaf area, leaves, chlorophyll")
-    axes[0].set_xlabel("Bar")
-    axes[0].set_ylabel("Leaf energy")
-    axes[0].set_ylim(0, 1.05)
-    axes[0].grid(True, linewidth=0.8)
+    for row_index, batch in enumerate(batches):
+        color = BATCH_COLORS.get(batch, "#355c7d")
+        batch_features = _batch_bar_features(features, batch, ["leaf_energy"])
+        batch_melody = melody[melody["batch"] == batch]
+        pitch_summary = _batch_register_summary(batch_melody, int(events["bar_index"].max()))
+        ax_data = axes[row_index, 0]
+        ax_music = axes[row_index, 1]
 
-    for batch, group in melody[melody["batch"] != "ACCOMP"].groupby("batch"):
-        axes[1].scatter(group["beat_start"] / 4 + 1, group["pitch_midi"], s=np.maximum(10, group["velocity"] / 4), alpha=0.58, label=batch)
-    axes[1].plot(melody_bar["bar_index"], melody_bar["pitch"], color="#1d3557", linewidth=2.0, label="mean melody register")
-    axes[1].set_title("Music: plant melody register")
-    axes[1].set_xlabel("Bar")
-    axes[1].set_ylabel("MIDI pitch")
-    axes[1].legend(frameon=False, loc="upper left")
-    axes[1].grid(True, linewidth=0.8)
+        ax_data.plot(batch_features["bar_index"], batch_features["leaf_energy"], color=color, linewidth=2.4)
+        ax_data.fill_between(batch_features["bar_index"], 0, batch_features["leaf_energy"], color=color, alpha=0.2)
+        ax_data.set_ylabel(f"{batch}\nLeaf energy")
+        ax_data.set_ylim(0, 1.05)
+        ax_data.grid(True, linewidth=0.8)
+        if row_index == 0:
+            ax_data.set_title("Data: leaf area, leaves, chlorophyll")
 
+        ax_music.scatter(batch_melody["beat_start"] / 4 + 1, batch_melody["pitch_midi"], s=np.maximum(12, batch_melody["velocity"] / 3.8), color=color, alpha=0.48)
+        ax_music.plot(pitch_summary["bar_index"], pitch_summary["rolling_median_pitch"], color="#1d3557", linewidth=2.3, label="rolling median register")
+        ax_music.set_ylabel("Pitch")
+        ax_music.grid(True, linewidth=0.8)
+        if row_index == 0:
+            ax_music.set_title("Music: same batch melody register")
+            ax_music.legend(frameon=False, loc="upper left")
+    axes[-1, 0].set_xlabel("Bar")
+    axes[-1, 1].set_xlabel("Bar")
     _shade_sections(config=None, axes=axes)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(figures / "leaf_to_register.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 
-def _plot_harmony_to_accompaniment(plt, figures, events: pd.DataFrame, harmony_plan: pd.DataFrame) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
-    fig.suptitle("Harmony Becomes A Flowing Broken-Chord Texture", fontsize=18, fontweight="bold", y=1.03)
+def _batch_bar_features(features: pd.DataFrame, batch: str, signals: list[str]) -> pd.DataFrame:
+    return features[features["Random"] == batch].groupby("bar_index", as_index=False).agg({signal: "mean" for signal in signals})
 
-    unique_chords = list(dict.fromkeys(harmony_plan["chord_symbol"].tolist()))
-    chord_to_y = {chord: idx for idx, chord in enumerate(unique_chords)}
-    colors = {"i": "#355c7d", "IV": "#2a9d8f", "VII": "#d6a542", "III": "#c9774d", "v": "#6d597a"}
-    for _, row in harmony_plan.iterrows():
-        y = chord_to_y[row["chord_symbol"]]
-        start_bar = float(row["beat_start"]) / 4 + 1
-        width = (float(row["beat_end"]) - float(row["beat_start"])) / 4
-        axes[0].broken_barh([(start_bar, width)], (y - 0.38, 0.76), facecolors=colors.get(row["chord_function"], "#777777"), alpha=0.9)
-    axes[0].set_yticks(range(len(unique_chords)))
-    axes[0].set_yticklabels(unique_chords)
-    axes[0].set_xlabel("Bar")
-    axes[0].set_title("Data-shaped harmonic path")
-    axes[0].grid(True, axis="x", linewidth=0.8)
 
-    accomp = events[events["event_type"].isin(["accompaniment", "resolution"])]
-    melody = events[events["event_type"] == "melody"]
-    axes[1].scatter(accomp["beat_start"] / 4 + 1, accomp["pitch_midi"], s=8, color="#2a9d8f", alpha=0.42, label="broken-chord accompaniment")
-    axes[1].scatter(melody["beat_start"] / 4 + 1, melody["pitch_midi"], s=16, color="#e76f51", alpha=0.45, label="plant melody")
-    axes[1].set_xlabel("Bar")
-    axes[1].set_ylabel("MIDI pitch")
-    axes[1].set_title("Music: accompaniment under melody")
-    axes[1].legend(frameon=False, loc="upper left")
-    axes[1].grid(True, linewidth=0.8)
+def _batch_bar_music(events: pd.DataFrame, batch: str) -> pd.DataFrame:
+    bars = pd.DataFrame({"bar_index": range(1, int(events["bar_index"].max()) + 1)})
+    batch_events = events[events["batch"] == batch]
+    summary = batch_events.groupby("bar_index", as_index=False).agg(notes=("event_id", "count"), velocity=("velocity", "mean"))
+    return bars.merge(summary, on="bar_index", how="left").fillna({"notes": 0, "velocity": 0})
 
-    _shade_sections(config=None, axes=axes)
-    fig.tight_layout()
-    fig.savefig(figures / "harmony_to_accompaniment.png", dpi=180, bbox_inches="tight")
-    plt.close(fig)
+
+def _batch_register_summary(events: pd.DataFrame, max_bar: int) -> pd.DataFrame:
+    bars = pd.DataFrame({"bar_index": range(1, max_bar + 1)})
+    summary = events.groupby("bar_index", as_index=False).agg(median_pitch=("pitch_midi", "median"))
+    summary = bars.merge(summary, on="bar_index", how="left")
+    summary["median_pitch"] = summary["median_pitch"].interpolate(limit_direction="both")
+    summary["rolling_median_pitch"] = summary["median_pitch"].rolling(8, center=True, min_periods=1).median()
+    return summary
 
 
 def _shade_sections(config, axes) -> None:
@@ -171,7 +172,7 @@ def _shade_sections(config, axes) -> None:
         (41, 60, "Bloom"),
         (61, 75, "Settling"),
     ]
-    for ax in axes:
+    for ax in np.ravel(axes):
         ylim = ax.get_ylim()
         for start, end, name in sections:
             ax.axvspan(start, end, color="#d8d0c3", alpha=0.12, linewidth=0)
@@ -179,7 +180,7 @@ def _shade_sections(config, axes) -> None:
 
 
 def _write_fallback_tables(figures, features: pd.DataFrame, events: pd.DataFrame, harmony_plan: pd.DataFrame | None) -> None:
-    features.groupby("bar_index", as_index=False).agg({"growth_speed": "mean", "vitality": "mean", "leaf_energy": "mean"}).to_csv(figures / "showcase_data_summary.csv", index=False)
+    features.groupby(["Random", "bar_index"], as_index=False).agg({"growth_speed": "mean", "vitality": "mean", "leaf_energy": "mean", "root_energy": "mean"}).to_csv(figures / "showcase_data_summary.csv", index=False)
     events[["event_type", "batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "chord_symbol"]].to_csv(figures / "showcase_music_events.csv", index=False)
     if harmony_plan is not None:
         harmony_plan.to_csv(figures / "showcase_harmony.csv", index=False)

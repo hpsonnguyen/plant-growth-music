@@ -30,7 +30,7 @@ Dm9, G9, Cmaj7, Fmaj7, Am7
 |---|---|
 | `growth_mass` | Note body, melodic direction, phrase weight |
 | `leaf_energy` | Register, openness, vertical reach |
-| `root_energy` | Tension, grounding, leap pressure |
+| `root_energy` | Root activity and grounding |
 | `vitality` | Dynamics and expressive intensity |
 | `growth_speed` | Rhythmic activity and local motion |
 
@@ -79,7 +79,7 @@ The piece ends with a sustained `D3`, the tonic of the scale. It is a small but 
 
 The beginning should feel like a field before sunrise: sparse, low, half-awake.
 
-The middle should feel increasingly animated, as if the plant measurements have become musical pressure.
+The middle should feel increasingly animated, as if the plant measurements have become musical motion.
 
 The bloom should feel like the texture opening all at once: denser accompaniment, stronger dynamics, brighter register.
 

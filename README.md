@@ -2,7 +2,7 @@
 
 This repository turns greenhouse plant growth measurements into a short musical work.
 
-The plants do not simply become notes. Their growth becomes pressure, motion, brightness, density, and release. Three plant batches sing as three melodic stems; a quiet broken-chord accompaniment gives them harmonic ground; the piece closes on a final `D3`, as if the data exhales.
+The plants do not simply become notes. Their growth becomes motion, brightness, density, and release. Three plant batches sing as three melodic stems; a quiet broken-chord accompaniment gives them harmonic ground; the piece closes on a final `D3`, as if the data exhales.
 
 [Download the generated WAV demo](outputs/audio/plant_music_demo.wav)
 
@@ -13,7 +13,6 @@ outputs/audio/plant_music_demo.wav
 outputs/midi/plant_music_full.mid
 outputs/figures/growth_to_intensity.png
 outputs/figures/leaf_to_register.png
-outputs/figures/harmony_to_accompaniment.png
 ```
 
 The isolated MIDI stems are also exported:
@@ -68,7 +67,7 @@ The raw plant measurements are blended into musical control signals:
 |---|---|
 | `growth_mass` | Phrase body, duration, melodic weight |
 | `leaf_energy` | Register and openness |
-| `root_energy` | Tension and leap pressure |
+| `root_energy` | Root activity and grounding |
 | `vitality` | Dynamics |
 | `growth_speed` | Rhythmic activity |
 
@@ -99,25 +98,19 @@ The final note is a sustained `D3`, the tonic of the scale.
 
 ## Showcase Figures
 
-The visualizations are paired: plant behavior on one side, musical consequence on the other.
+The visualizations are paired: plant behavior on one side, musical consequence on the other. Batch identity is preserved throughout, so `R1`, `R2`, and `R3` can be read as three separate translations rather than one averaged plant.
 
 ### Growth To Intensity
 
 ![Growth to intensity](outputs/figures/growth_to_intensity.png)
 
-`growth_speed` and `vitality` become musical density and dynamic force. This is where the biological pulse becomes audible activity.
+For each batch, `growth_speed` and `vitality` are shown beside that batch's melody density and velocity. This is where the biological pulse becomes audible activity.
 
 ### Leaf Energy To Register
 
 ![Leaf to register](outputs/figures/leaf_to_register.png)
 
-Leaf-related energy pushes the melody toward a more open register. The figure shows the data curve beside the pitch field it helps shape.
-
-### Harmony To Accompaniment
-
-![Harmony to accompaniment](outputs/figures/harmony_to_accompaniment.png)
-
-The harmonic plan becomes the continuous broken-chord background. The left panel shows the chord path; the right panel shows the accompaniment moving underneath the plant melodies.
+For each batch, leaf-related energy is shown beside that same batch's melody register. The figure shows how leaf growth helps open the pitch field without mixing the batches together.
 
 ## Current Output Snapshot
 
