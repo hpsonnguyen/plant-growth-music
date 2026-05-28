@@ -8,6 +8,13 @@ import pandas as pd
 from .config import output_path
 
 
+SHOWCASE_FIGURES = {
+    "growth_to_intensity.png",
+    "leaf_to_register.png",
+    "harmony_to_accompaniment.png",
+}
+
+
 def _try_matplotlib():
     try:
         import matplotlib.pyplot as plt
@@ -16,153 +23,167 @@ def _try_matplotlib():
         return None
 
 
-def _write_svg_line(path, series_by_name: dict[str, list[float]], title: str) -> None:
-    width, height = 1200, 420
-    colors = ["#2f7d32", "#1976d2", "#c55a11", "#7b1fa2", "#455a64", "#d32f2f"]
-    body = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">', '<rect width="100%" height="100%" fill="white"/>', f'<text x="24" y="32" font-size="22" font-family="sans-serif">{title}</text>']
-    for idx, (name, values) in enumerate(series_by_name.items()):
-        if not values:
-            continue
-        n = len(values)
-        points = []
-        lo, hi = min(values), max(values)
-        span = hi - lo if hi != lo else 1.0
-        for i, value in enumerate(values):
-            x = 60 + i * (width - 100) / max(1, n - 1)
-            y = height - 50 - ((value - lo) / span) * (height - 100)
-            points.append(f"{x:.1f},{y:.1f}")
-        color = colors[idx % len(colors)]
-        body.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2"/>')
-        body.append(f'<text x="{70 + idx * 160}" y="{height - 14}" font-size="14" fill="{color}" font-family="sans-serif">{name}</text>')
-    body.append("</svg>")
-    path.write_text("\n".join(body), encoding="utf-8")
-
-
 def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFrame, harmony_plan: pd.DataFrame | None = None) -> None:
     figures = output_path(config, "figures")
+    figures.mkdir(parents=True, exist_ok=True)
+    _remove_old_figures(figures)
     plt = _try_matplotlib()
-
-    signals = ["growth_mass", "leaf_energy", "root_energy", "vitality", "growth_speed"]
-    if plt:
-        readme = figures / "README.txt"
-        if readme.exists():
-            readme.unlink()
-        fig, axes = plt.subplots(len(signals), 1, figsize=(14, 10), sharex=True)
-        for ax, signal in zip(axes, signals):
-            for batch, group in features.groupby("Random"):
-                ax.plot(group["beat_index"], group[signal], label=batch)
-            ax.set_ylabel(signal)
-        axes[0].legend()
-        axes[-1].set_xlabel("Beat")
-        fig.tight_layout()
-        fig.savefig(figures / "growth_signals.png", dpi=160)
-        plt.close(fig)
-
-        fig, ax = plt.subplots(figsize=(14, 6))
-        for batch, group in events.groupby("batch"):
-            ax.scatter(group["beat_start"], group["pitch_midi"], s=np.maximum(8, group["velocity"] / 3), alpha=0.65, label=batch)
-        ax.set_xlabel("Beat")
-        ax.set_ylabel("MIDI pitch")
-        ax.legend()
-        fig.tight_layout()
-        fig.savefig(figures / "piano_roll.png", dpi=160)
-        plt.close(fig)
-
-        fig, ax = plt.subplots(figsize=(14, 6))
-        for batch, group in events.groupby("batch"):
-            ax.plot(group["beat_start"], group["pitch_midi"], label=f"{batch} pitch", alpha=0.75)
-        ax.set_xlabel("Beat")
-        ax.set_ylabel("Pitch")
-        ax.legend()
-        fig.tight_layout()
-        fig.savefig(figures / "pitch_vs_growth.png", dpi=160)
-        plt.close(fig)
-
-        density = events.groupby(["batch", "bar_index"]).size().reset_index(name="notes_per_bar")
-        fig, ax = plt.subplots(figsize=(14, 6))
-        for batch, group in density.groupby("batch"):
-            ax.plot(group["bar_index"], group["notes_per_bar"], label=batch)
-        ax.set_xlabel("Bar")
-        ax.set_ylabel("Notes per bar")
-        ax.legend()
-        fig.tight_layout()
-        fig.savefig(figures / "velocity_density.png", dpi=160)
-        plt.close(fig)
-
-        comparison = events.groupby("batch").agg(pitch_min=("pitch_midi", "min"), pitch_max=("pitch_midi", "max"), velocity_mean=("velocity", "mean"), events=("event_id", "count"))
-        fig, ax = plt.subplots(figsize=(10, 5))
-        comparison[["velocity_mean", "events"]].plot(kind="bar", ax=ax)
-        fig.tight_layout()
-        fig.savefig(figures / "stem_comparison.png", dpi=160)
-        plt.close(fig)
-
-        if harmony_plan is not None and not harmony_plan.empty:
-            _plot_harmony_timeline(plt, figures, harmony_plan)
-            _plot_chord_piano_roll(plt, figures, events)
-            _plot_melody_chord_fit(plt, figures, events)
+    if plt is None:
+        _write_fallback_tables(figures, features, events, harmony_plan)
     else:
-        for signal in signals:
-            series = {batch: group.sort_values("beat_index")[signal].tolist() for batch, group in features.groupby("Random")}
-            _write_svg_line(figures / f"{signal}.svg", series, signal)
-        piano = events[["batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "section"]]
-        piano.to_csv(figures / "piano_roll.csv", index=False)
+        _set_style(plt)
+        _plot_growth_to_intensity(plt, figures, features, events)
+        _plot_leaf_to_register(plt, figures, features, events)
         if harmony_plan is not None and not harmony_plan.empty:
-            harmony_plan.to_csv(figures / "harmony_timeline.csv", index=False)
-            events[["event_type", "batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "chord_symbol"]].to_csv(figures / "chord_piano_roll.csv", index=False)
-        (figures / "README.txt").write_text("matplotlib is not installed, so PNG figures were not generated. SVG signal plots and CSV visualization data are available in this directory.\n", encoding="utf-8")
-
+            _plot_harmony_to_accompaniment(plt, figures, events, harmony_plan)
     _write_metrics(config, features, events)
 
 
-def _plot_harmony_timeline(plt, figures, harmony_plan: pd.DataFrame) -> None:
+def _set_style(plt) -> None:
+    plt.rcParams.update({
+        "figure.facecolor": "#fbfaf6",
+        "axes.facecolor": "#fbfaf6",
+        "axes.edgecolor": "#d8d0c3",
+        "axes.labelcolor": "#2d2a26",
+        "axes.titlecolor": "#1f1b16",
+        "xtick.color": "#4b4640",
+        "ytick.color": "#4b4640",
+        "grid.color": "#e7dfd3",
+        "font.family": "DejaVu Sans",
+    })
+
+
+def _remove_old_figures(figures) -> None:
+    stale = [
+        "growth_signals.png", "piano_roll.png", "pitch_vs_growth.png", "velocity_density.png",
+        "stem_comparison.png", "harmony_timeline.png", "chord_piano_roll.png", "melody_chord_fit.png",
+        "growth_mass.svg", "leaf_energy.svg", "root_energy.svg", "vitality.svg", "growth_speed.svg",
+        "piano_roll.csv", "README.txt",
+    ]
+    for name in stale:
+        path = figures / name
+        if path.exists() and name not in SHOWCASE_FIGURES:
+            path.unlink()
+
+
+def _plot_growth_to_intensity(plt, figures, features: pd.DataFrame, events: pd.DataFrame) -> None:
+    bar_features = features.groupby("bar_index", as_index=False).agg({"growth_speed": "mean", "vitality": "mean"})
+    musical = events.groupby("bar_index", as_index=False).agg(notes=("event_id", "count"), velocity=("velocity", "mean"))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
+    fig.suptitle("Growth Activity Becomes Musical Intensity", fontsize=18, fontweight="bold", y=1.03)
+
+    axes[0].plot(bar_features["bar_index"], bar_features["growth_speed"], color="#547d49", linewidth=2.2, label="growth speed")
+    axes[0].plot(bar_features["bar_index"], bar_features["vitality"], color="#9b5f2e", linewidth=2.2, label="vitality")
+    axes[0].fill_between(bar_features["bar_index"], 0, bar_features["growth_speed"], color="#547d49", alpha=0.18)
+    axes[0].set_title("Data: movement and vitality")
+    axes[0].set_xlabel("Bar")
+    axes[0].set_ylabel("Normalized signal")
+    axes[0].set_ylim(0, 1.05)
+    axes[0].legend(frameon=False)
+    axes[0].grid(True, linewidth=0.8)
+
+    axes[1].bar(musical["bar_index"], musical["notes"], color="#315f72", alpha=0.72, label="events per bar")
+    ax2 = axes[1].twinx()
+    ax2.plot(musical["bar_index"], musical["velocity"], color="#c86444", linewidth=2.2, label="mean velocity")
+    axes[1].set_title("Music: density and dynamic force")
+    axes[1].set_xlabel("Bar")
+    axes[1].set_ylabel("Events per bar")
+    ax2.set_ylabel("Mean MIDI velocity")
+    axes[1].grid(True, axis="y", linewidth=0.8)
+    lines, labels = axes[1].get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    axes[1].legend(lines + lines2, labels + labels2, frameon=False, loc="upper left")
+
+    _shade_sections(config=None, axes=axes)
+    fig.tight_layout()
+    fig.savefig(figures / "growth_to_intensity.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_leaf_to_register(plt, figures, features: pd.DataFrame, events: pd.DataFrame) -> None:
+    melody = events[events["event_type"].isin(["melody", "resolution"])].copy()
+    bar_leaf = features.groupby("bar_index", as_index=False)["leaf_energy"].mean()
+    melody_bar = melody.groupby("bar_index", as_index=False).agg(pitch=("pitch_midi", "mean"))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
+    fig.suptitle("Leaf Energy Opens The Register", fontsize=18, fontweight="bold", y=1.03)
+
+    axes[0].plot(bar_leaf["bar_index"], bar_leaf["leaf_energy"], color="#4c8c71", linewidth=2.4)
+    axes[0].fill_between(bar_leaf["bar_index"], 0, bar_leaf["leaf_energy"], color="#4c8c71", alpha=0.2)
+    axes[0].set_title("Data: leaf area, leaves, chlorophyll")
+    axes[0].set_xlabel("Bar")
+    axes[0].set_ylabel("Leaf energy")
+    axes[0].set_ylim(0, 1.05)
+    axes[0].grid(True, linewidth=0.8)
+
+    for batch, group in melody[melody["batch"] != "ACCOMP"].groupby("batch"):
+        axes[1].scatter(group["beat_start"] / 4 + 1, group["pitch_midi"], s=np.maximum(10, group["velocity"] / 4), alpha=0.58, label=batch)
+    axes[1].plot(melody_bar["bar_index"], melody_bar["pitch"], color="#1d3557", linewidth=2.0, label="mean melody register")
+    axes[1].set_title("Music: plant melody register")
+    axes[1].set_xlabel("Bar")
+    axes[1].set_ylabel("MIDI pitch")
+    axes[1].legend(frameon=False, loc="upper left")
+    axes[1].grid(True, linewidth=0.8)
+
+    _shade_sections(config=None, axes=axes)
+    fig.tight_layout()
+    fig.savefig(figures / "leaf_to_register.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_harmony_to_accompaniment(plt, figures, events: pd.DataFrame, harmony_plan: pd.DataFrame) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5), sharex=False)
+    fig.suptitle("Harmony Becomes A Flowing Broken-Chord Texture", fontsize=18, fontweight="bold", y=1.03)
+
     unique_chords = list(dict.fromkeys(harmony_plan["chord_symbol"].tolist()))
     chord_to_y = {chord: idx for idx, chord in enumerate(unique_chords)}
-    colors = {"i": "#355c7d", "IV": "#2a9d8f", "VII": "#e9c46a", "III": "#f4a261", "v": "#6d597a"}
-    fig, ax = plt.subplots(figsize=(14, 4.8))
+    colors = {"i": "#355c7d", "IV": "#2a9d8f", "VII": "#d6a542", "III": "#c9774d", "v": "#6d597a"}
     for _, row in harmony_plan.iterrows():
         y = chord_to_y[row["chord_symbol"]]
-        width = float(row["beat_end"]) - float(row["beat_start"])
-        ax.broken_barh([(float(row["beat_start"]), width)], (y - 0.38, 0.76), facecolors=colors.get(row["chord_function"], "#777777"), alpha=0.9)
-        if width >= 2.0:
-            ax.text(float(row["beat_start"]) + width / 2, y, row["chord_symbol"], ha="center", va="center", fontsize=8, color="white")
-    ax.set_yticks(range(len(unique_chords)))
-    ax.set_yticklabels(unique_chords)
-    ax.set_xlabel("Beat")
-    ax.set_title("Harmony Timeline")
+        start_bar = float(row["beat_start"]) / 4 + 1
+        width = (float(row["beat_end"]) - float(row["beat_start"])) / 4
+        axes[0].broken_barh([(start_bar, width)], (y - 0.38, 0.76), facecolors=colors.get(row["chord_function"], "#777777"), alpha=0.9)
+    axes[0].set_yticks(range(len(unique_chords)))
+    axes[0].set_yticklabels(unique_chords)
+    axes[0].set_xlabel("Bar")
+    axes[0].set_title("Data-shaped harmonic path")
+    axes[0].grid(True, axis="x", linewidth=0.8)
+
+    accomp = events[events["event_type"].isin(["accompaniment", "resolution"])]
+    melody = events[events["event_type"] == "melody"]
+    axes[1].scatter(accomp["beat_start"] / 4 + 1, accomp["pitch_midi"], s=8, color="#2a9d8f", alpha=0.42, label="broken-chord accompaniment")
+    axes[1].scatter(melody["beat_start"] / 4 + 1, melody["pitch_midi"], s=16, color="#e76f51", alpha=0.45, label="plant melody")
+    axes[1].set_xlabel("Bar")
+    axes[1].set_ylabel("MIDI pitch")
+    axes[1].set_title("Music: accompaniment under melody")
+    axes[1].legend(frameon=False, loc="upper left")
+    axes[1].grid(True, linewidth=0.8)
+
+    _shade_sections(config=None, axes=axes)
     fig.tight_layout()
-    fig.savefig(figures / "harmony_timeline.png", dpi=160)
+    fig.savefig(figures / "harmony_to_accompaniment.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 
-def _plot_chord_piano_roll(plt, figures, events: pd.DataFrame) -> None:
-    colors = {"accompaniment": "#2a9d8f", "bass": "#264653", "arpeggio": "#2a9d8f", "melody": "#e76f51", "resolution": "#1d3557"}
-    fig, ax = plt.subplots(figsize=(14, 7))
-    for event_type, group in events.groupby("event_type"):
-        ax.scatter(group["beat_start"], group["pitch_midi"], s=np.maximum(6, group["velocity"] / 4), alpha=0.62, label=event_type, color=colors.get(event_type, "#666666"))
-    ax.set_xlabel("Beat")
-    ax.set_ylabel("MIDI pitch")
-    ax.set_title("Layered Piano Roll: Broken-Chord Accompaniment And Melody")
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(figures / "chord_piano_roll.png", dpi=160)
-    plt.close(fig)
+def _shade_sections(config, axes) -> None:
+    sections = [
+        (1, 16, "Germination"),
+        (17, 40, "Growth"),
+        (41, 60, "Bloom"),
+        (61, 75, "Settling"),
+    ]
+    for ax in axes:
+        ylim = ax.get_ylim()
+        for start, end, name in sections:
+            ax.axvspan(start, end, color="#d8d0c3", alpha=0.12, linewidth=0)
+        ax.set_ylim(ylim)
 
 
-def _plot_melody_chord_fit(plt, figures, events: pd.DataFrame) -> None:
-    melody = events[events.get("event_type", "") == "melody"].copy()
-    if melody.empty or "is_chord_tone" not in melody.columns:
-        return
-    fit = melody.groupby("bar_index")["is_chord_tone"].mean().reset_index(name="fit_rate")
-    fig, ax = plt.subplots(figsize=(14, 4.5))
-    ax.plot(fit["bar_index"], fit["fit_rate"], color="#355c7d", linewidth=2)
-    ax.fill_between(fit["bar_index"], 0, fit["fit_rate"], color="#a8dadc", alpha=0.45)
-    ax.set_ylim(0, 1.05)
-    ax.set_xlabel("Bar")
-    ax.set_ylabel("Melody chord-tone fit")
-    ax.set_title("Melody Fit To Active Harmony")
-    fig.tight_layout()
-    fig.savefig(figures / "melody_chord_fit.png", dpi=160)
-    plt.close(fig)
+def _write_fallback_tables(figures, features: pd.DataFrame, events: pd.DataFrame, harmony_plan: pd.DataFrame | None) -> None:
+    features.groupby("bar_index", as_index=False).agg({"growth_speed": "mean", "vitality": "mean", "leaf_energy": "mean"}).to_csv(figures / "showcase_data_summary.csv", index=False)
+    events[["event_type", "batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "chord_symbol"]].to_csv(figures / "showcase_music_events.csv", index=False)
+    if harmony_plan is not None:
+        harmony_plan.to_csv(figures / "showcase_harmony.csv", index=False)
+    (figures / "README.txt").write_text("matplotlib is not installed, so showcase PNG figures were not generated. CSV summary files are available here.\n", encoding="utf-8")
 
 
 def _safe_corr(a: pd.Series, b: pd.Series) -> float | None:
@@ -191,7 +212,6 @@ def _write_metrics(config: dict, features: pd.DataFrame, events: pd.DataFrame) -
             "down": int((diff < 0).sum()),
             "same": int((diff == 0).sum()),
         }
-
     chord_fit = None
     if "is_chord_tone" in melody_events.columns and not melody_events.empty:
         chord_fit = float(melody_events["is_chord_tone"].astype(bool).mean())
