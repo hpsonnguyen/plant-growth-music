@@ -1,6 +1,6 @@
-# Plant Music
+# Plant Growth Music
 
-Plant Music is a data-sonification project that turns greenhouse plant growth measurements into a 3-minute musical piece. The piece uses three musical stems, one for each plant batch, and maps growth patterns into pitch, rhythm, dynamics, register, and form.
+Plant Growth Music is a data-sonification project that turns greenhouse plant growth measurements into a 3-minute musical piece. The piece uses three musical stems, one for each plant batch, and maps growth patterns into pitch, rhythm, dynamics, register, and form.
 
 The data provides the structure for the composition. Changes in plant growth become changes in melody, timing, intensity, and texture, creating a piece that follows the development of the plants over time.
 
