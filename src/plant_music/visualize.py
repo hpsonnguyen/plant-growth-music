@@ -38,7 +38,7 @@ def _write_svg_line(path, series_by_name: dict[str, list[float]], title: str) ->
     path.write_text("\n".join(body), encoding="utf-8")
 
 
-def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFrame) -> None:
+def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFrame, harmony_plan: pd.DataFrame | None = None) -> None:
     figures = output_path(config, "figures")
     plt = _try_matplotlib()
 
@@ -95,15 +95,74 @@ def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFra
         fig.tight_layout()
         fig.savefig(figures / "stem_comparison.png", dpi=160)
         plt.close(fig)
+
+        if harmony_plan is not None and not harmony_plan.empty:
+            _plot_harmony_timeline(plt, figures, harmony_plan)
+            _plot_chord_piano_roll(plt, figures, events)
+            _plot_melody_chord_fit(plt, figures, events)
     else:
         for signal in signals:
             series = {batch: group.sort_values("beat_index")[signal].tolist() for batch, group in features.groupby("Random")}
             _write_svg_line(figures / f"{signal}.svg", series, signal)
         piano = events[["batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "section"]]
         piano.to_csv(figures / "piano_roll.csv", index=False)
+        if harmony_plan is not None and not harmony_plan.empty:
+            harmony_plan.to_csv(figures / "harmony_timeline.csv", index=False)
+            events[["event_type", "batch", "beat_start", "beat_duration", "pitch_midi", "velocity", "chord_symbol"]].to_csv(figures / "chord_piano_roll.csv", index=False)
         (figures / "README.txt").write_text("matplotlib is not installed, so PNG figures were not generated. SVG signal plots and CSV visualization data are available in this directory.\n", encoding="utf-8")
 
     _write_metrics(config, features, events)
+
+
+def _plot_harmony_timeline(plt, figures, harmony_plan: pd.DataFrame) -> None:
+    unique_chords = list(dict.fromkeys(harmony_plan["chord_symbol"].tolist()))
+    chord_to_y = {chord: idx for idx, chord in enumerate(unique_chords)}
+    colors = {"i": "#355c7d", "IV": "#2a9d8f", "VII": "#e9c46a", "III": "#f4a261", "v": "#6d597a"}
+    fig, ax = plt.subplots(figsize=(14, 4.8))
+    for _, row in harmony_plan.iterrows():
+        y = chord_to_y[row["chord_symbol"]]
+        width = float(row["beat_end"]) - float(row["beat_start"])
+        ax.broken_barh([(float(row["beat_start"]), width)], (y - 0.38, 0.76), facecolors=colors.get(row["chord_function"], "#777777"), alpha=0.9)
+        if width >= 2.0:
+            ax.text(float(row["beat_start"]) + width / 2, y, row["chord_symbol"], ha="center", va="center", fontsize=8, color="white")
+    ax.set_yticks(range(len(unique_chords)))
+    ax.set_yticklabels(unique_chords)
+    ax.set_xlabel("Beat")
+    ax.set_title("Harmony Timeline")
+    fig.tight_layout()
+    fig.savefig(figures / "harmony_timeline.png", dpi=160)
+    plt.close(fig)
+
+
+def _plot_chord_piano_roll(plt, figures, events: pd.DataFrame) -> None:
+    colors = {"accompaniment": "#2a9d8f", "bass": "#264653", "arpeggio": "#2a9d8f", "melody": "#e76f51"}
+    fig, ax = plt.subplots(figsize=(14, 7))
+    for event_type, group in events.groupby("event_type"):
+        ax.scatter(group["beat_start"], group["pitch_midi"], s=np.maximum(6, group["velocity"] / 4), alpha=0.62, label=event_type, color=colors.get(event_type, "#666666"))
+    ax.set_xlabel("Beat")
+    ax.set_ylabel("MIDI pitch")
+    ax.set_title("Layered Piano Roll: Broken-Chord Accompaniment And Melody")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(figures / "chord_piano_roll.png", dpi=160)
+    plt.close(fig)
+
+
+def _plot_melody_chord_fit(plt, figures, events: pd.DataFrame) -> None:
+    melody = events[events.get("event_type", "") == "melody"].copy()
+    if melody.empty or "is_chord_tone" not in melody.columns:
+        return
+    fit = melody.groupby("bar_index")["is_chord_tone"].mean().reset_index(name="fit_rate")
+    fig, ax = plt.subplots(figsize=(14, 4.5))
+    ax.plot(fit["bar_index"], fit["fit_rate"], color="#355c7d", linewidth=2)
+    ax.fill_between(fit["bar_index"], 0, fit["fit_rate"], color="#a8dadc", alpha=0.45)
+    ax.set_ylim(0, 1.05)
+    ax.set_xlabel("Bar")
+    ax.set_ylabel("Melody chord-tone fit")
+    ax.set_title("Melody Fit To Active Harmony")
+    fig.tight_layout()
+    fig.savefig(figures / "melody_chord_fit.png", dpi=160)
+    plt.close(fig)
 
 
 def _safe_corr(a: pd.Series, b: pd.Series) -> float | None:
@@ -122,8 +181,9 @@ def _write_metrics(config: dict, features: pd.DataFrame, events: pd.DataFrame) -
     feature_bar = features.groupby(["Random", "bar_index"], as_index=False).agg({"growth_speed": "mean", "vitality": "mean", "leaf_energy": "mean"})
     event_bar = events.groupby(["batch", "bar_index"], as_index=False).agg({"velocity": "mean", "pitch_midi": "mean"})
     merged = feature_bar.merge(event_bar, left_on=["Random", "bar_index"], right_on=["batch", "bar_index"], how="inner").merge(density, left_on=["Random", "bar_index"], right_on=["batch", "bar_index"], how="left")
+    melody_events = events[events["event_type"] == "melody"] if "event_type" in events.columns else events
     direction_balance = {}
-    for batch, group in events.sort_values(["batch", "beat_start"]).groupby("batch"):
+    for batch, group in melody_events.sort_values(["batch", "beat_start"]).groupby("batch"):
         diff = group["pitch_midi"].diff()
         direction_balance[batch] = {
             "up": int((diff > 0).sum()),
@@ -131,11 +191,17 @@ def _write_metrics(config: dict, features: pd.DataFrame, events: pd.DataFrame) -
             "same": int((diff == 0).sum()),
         }
 
+    chord_fit = None
+    if "is_chord_tone" in melody_events.columns and not melody_events.empty:
+        chord_fit = float(melody_events["is_chord_tone"].astype(bool).mean())
+
     metrics = {
         "duration_seconds": total_beats * 60 / bpm,
         "events_per_stem": events.groupby("batch").size().to_dict(),
+        "events_per_type": events.groupby("event_type").size().to_dict() if "event_type" in events.columns else {},
         "pitch_range_per_stem": events.groupby("batch")["pitch_midi"].agg(["min", "max"]).to_dict("index"),
-        "pitch_direction_balance": direction_balance,
+        "melody_pitch_direction_balance": direction_balance,
+        "melody_chord_tone_fit_rate": chord_fit,
         "mean_velocity_per_section": events.groupby("section")["velocity"].mean().round(3).to_dict(),
         "notes_per_bar_per_section": events.groupby("section").size().div(events.groupby("section")["bar_index"].nunique()).round(3).to_dict(),
         "correlations": {

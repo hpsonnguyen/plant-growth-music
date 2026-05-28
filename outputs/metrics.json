@@ -1,11 +1,20 @@
 {
   "duration_seconds": 200.0,
   "events_per_stem": {
+    "ACCOMP": 952,
     "R1": 203,
     "R2": 197,
     "R3": 206
   },
+  "events_per_type": {
+    "accompaniment": 952,
+    "melody": 606
+  },
   "pitch_range_per_stem": {
+    "ACCOMP": {
+      "min": 50,
+      "max": 71
+    },
     "R1": {
       "min": 36,
       "max": 74
@@ -19,38 +28,39 @@
       "max": 88
     }
   },
-  "pitch_direction_balance": {
+  "melody_pitch_direction_balance": {
     "R1": {
-      "up": 83,
-      "down": 77,
-      "same": 42
+      "up": 81,
+      "down": 78,
+      "same": 43
     },
     "R2": {
-      "up": 85,
-      "down": 65,
-      "same": 46
+      "up": 74,
+      "down": 62,
+      "same": 60
     },
     "R3": {
-      "up": 75,
-      "down": 76,
-      "same": 54
+      "up": 68,
+      "down": 69,
+      "same": 68
     }
   },
+  "melody_chord_tone_fit_rate": 0.9884488448844885,
   "mean_velocity_per_section": {
-    "bloom": 96.32,
-    "germination": 49.467,
-    "growth": 76.528,
-    "settling": 49.027
+    "bloom": 76.187,
+    "germination": 47.174,
+    "growth": 63.273,
+    "settling": 44.809
   },
   "notes_per_bar_per_section": {
-    "bloom": 9.7,
-    "germination": 5.625,
-    "growth": 8.833,
-    "settling": 7.333
+    "bloom": 25.7,
+    "germination": 13.625,
+    "growth": 24.833,
+    "settling": 15.333
   },
   "correlations": {
-    "vitality_vs_velocity": 0.8100845068012048,
+    "vitality_vs_velocity": 0.8098299615404501,
     "growth_speed_vs_note_density": 0.6376535349251737,
-    "leaf_energy_vs_pitch_register": 0.19468725286624874
+    "leaf_energy_vs_pitch_register": 0.18899470915714714
   }
 }

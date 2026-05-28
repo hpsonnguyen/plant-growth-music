@@ -13,7 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config/default.yml")
     args = parser.parse_args()
-    config, _, events = generate(args.config)
+    config, _, events, _ = generate(args.config)
     print(f"Generated {len(events)} MIDI events in {config['project']['output_dir']}")
 
 

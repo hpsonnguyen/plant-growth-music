@@ -90,6 +90,71 @@ mapping:
       - {name: "bloom", start_bar: 41, end_bar: 60, density_multiplier: 1.90, velocity_multiplier: 1.24}
       - {name: "settling", start_bar: 61, end_bar: 75, density_multiplier: 0.48, velocity_multiplier: 0.82}
 
+harmony:
+  enabled: true
+  key: "D"
+  mode: "dorian"
+  harmonic_rhythm:
+    germination: 2.0
+    growth: 1.0
+    bloom: 0.5
+    settling: 2.0
+  chord_palette:
+    - {symbol: "Dm9", degrees: [1, 3, 5, 7, 9], function: "i"}
+    - {symbol: "G6", degrees: [4, 6, 1, 2], function: "IV"}
+    - {symbol: "G9", degrees: [4, 6, 1, 3, 5], function: "IV"}
+    - {symbol: "Cmaj7", degrees: [7, 2, 4, 6], function: "VII"}
+    - {symbol: "Fmaj7", degrees: [3, 5, 7, 2], function: "III"}
+    - {symbol: "Am7", degrees: [5, 7, 2, 4], function: "v"}
+  progression_bias:
+    i: ["IV", "VII", "v"]
+    IV: ["VII", "i", "III"]
+    VII: ["III", "i", "IV"]
+    III: ["v", "IV", "i"]
+    v: ["i", "VII"]
+
+arpeggio:
+  enabled: false
+  patterns:
+    germination: ["root", "fifth", "third", "ninth"]
+    growth: ["root", "fifth", "third", "fifth", "ninth", "third", "fifth", "third"]
+    bloom: ["low_root", "fifth", "tenth", "ninth", "fifth", "third", "upper_fifth", "ninth"]
+    settling: ["fifth", "third", "root", "fifth"]
+  velocity_scale: 0.86
+  bass_velocity_scale: 0.95
+  melody_velocity_scale: 1.0
+  density_signal: "growth_speed"
+  step_beats:
+    germination: 1.0
+    growth: 0.5
+    bloom: 0.25
+    settling: 1.0
+  duration_ratio: 0.9
+  min_velocity: 48
+  bass_min_velocity: 52
+
+accompaniment:
+  enabled: true
+  track_name: "flowing_broken_chord_accompaniment"
+  channel: 3
+  program: 0
+  register_min: "D3"
+  register_max: "A5"
+  pattern: ["low", "middle", "high", "middle"]
+  step_beats:
+    germination: 0.5
+    growth: 0.25
+    bloom: 0.25
+    settling: 0.5
+  duration_ratio: 0.94
+  velocity_min: 42
+  velocity_max: 76
+  section_velocity_multiplier:
+    germination: 0.82
+    growth: 0.95
+    bloom: 1.08
+    settling: 0.78
+
 render:
   enabled: true
   soundfont: "/usr/share/sounds/sf2/FluidR3_GM.sf2"
