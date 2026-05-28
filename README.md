@@ -8,7 +8,7 @@ The data provides the structure for the composition. Changes in plant growth bec
 
 Generated demo audio:
 
-[Listen to the generated WAV demo](outputs/audio/plant_music_demo.wav)
+[Download to the generated WAV demo](outputs/audio/plant_music_demo.wav)
 
 The full MIDI arrangement is here:
 
@@ -34,12 +34,6 @@ data/Greenhouse Plant Growth Metrics.csv
 
 This [Kaggle](https://www.kaggle.com/datasets/adilshamim8/greenhouse-plant-growth-metrics) dataset contains `30,000` rows of plant growth measurements across three batches:
 
-For a brief dataset summary and exploratory analysis, see:
-
-```text
-data/greenhouse_plant_growth_eda.ipynb
-```
-
 | Batch | Musical Stem |
 |---|---|
 | `R1` | Marimba stem |
@@ -57,6 +51,8 @@ Current musical timeline:
 | Length | `75 bars` |
 | Duration | `200 seconds` |
 | Scale | `D Dorian` |
+
+For a brief dataset summary and exploratory analysis, see [data/greenhouse_plant_growth_eda.ipynb](data/greenhouse_plant_growth_eda.ipynb).
 
 ## Mapping Design
 
