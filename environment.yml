@@ -12,3 +12,10 @@ dependencies:
   - jupyter
   - nbformat
   - ipykernel
+  - pyyaml
+  - matplotlib
+  - pip
+  - pip:
+      - mido
+      - pretty_midi
+      - midi2audio

@@ -1,0 +1,56 @@
+{
+  "duration_seconds": 200.0,
+  "events_per_stem": {
+    "R1": 203,
+    "R2": 197,
+    "R3": 206
+  },
+  "pitch_range_per_stem": {
+    "R1": {
+      "min": 36,
+      "max": 74
+    },
+    "R2": {
+      "min": 55,
+      "max": 81
+    },
+    "R3": {
+      "min": 62,
+      "max": 88
+    }
+  },
+  "pitch_direction_balance": {
+    "R1": {
+      "up": 83,
+      "down": 77,
+      "same": 42
+    },
+    "R2": {
+      "up": 85,
+      "down": 65,
+      "same": 46
+    },
+    "R3": {
+      "up": 75,
+      "down": 76,
+      "same": 54
+    }
+  },
+  "mean_velocity_per_section": {
+    "bloom": 96.32,
+    "germination": 49.467,
+    "growth": 76.528,
+    "settling": 49.027
+  },
+  "notes_per_bar_per_section": {
+    "bloom": 9.7,
+    "germination": 5.625,
+    "growth": 8.833,
+    "settling": 7.333
+  },
+  "correlations": {
+    "vitality_vs_velocity": 0.8100845068012048,
+    "growth_speed_vs_note_density": 0.6376535349251737,
+    "leaf_energy_vs_pitch_register": 0.19468725286624874
+  }
+}

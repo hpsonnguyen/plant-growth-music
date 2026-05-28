@@ -1,0 +1,97 @@
+project:
+  input_csv: "data/Greenhouse Plant Growth Metrics.csv"
+  output_dir: "outputs"
+  random_seed: 7
+
+timeline:
+  bpm: 90
+  meter_numerator: 4
+  meter_denominator: 4
+  bars: 75
+  beats_per_bar: 4
+  rows_per_beat: 100
+  ticks_per_beat: 480
+
+scale:
+  root: "D"
+  mode: "dorian"
+
+stems:
+  R1:
+    track_name: "R1_marimba"
+    channel: 0
+    program: 12
+    register_min: "C2"
+    register_max: "D5"
+    center_note: "D3"
+  R2:
+    track_name: "R2_harp"
+    channel: 1
+    program: 46
+    register_min: "G3"
+    register_max: "A5"
+    center_note: "D4"
+  R3:
+    track_name: "R3_celesta"
+    channel: 2
+    program: 8
+    register_min: "D4"
+    register_max: "E6"
+    center_note: "A4"
+
+derived_signals:
+  growth_mass:
+    method: "weighted_mean"
+    features: {AWWGV: 0.35, ADWV: 0.20, AWWR: 0.25, ADWR: 0.20}
+  leaf_energy:
+    method: "weighted_mean"
+    features: {ALAP: 0.45, ANPL: 0.25, ACHP: 0.30}
+  root_energy:
+    method: "weighted_mean"
+    features: {ARL: 0.40, ARD: 0.30, PDMRG: 0.30}
+  vitality:
+    method: "weighted_mean"
+    features: {PHR: 0.40, ACHP: 0.30, ALAP: 0.30}
+  growth_speed:
+    method: "diff_abs"
+    source: "growth_mass"
+    smoothing_window: 5
+
+mapping:
+  pitch:
+    method: "contour_walker"
+    register_signal: "leaf_energy"
+    motion_signal: "growth_speed"
+    direction_signal: "growth_mass"
+    tension_signal: "root_energy"
+    return_to_center_strength: 0.08
+    max_scale_steps_per_event: 5
+    leap_threshold: 0.72
+    leap_probability: 0.45
+    leap_steps: 4
+  rhythm:
+    density_signal: "growth_speed"
+    duration_signal: "growth_mass"
+    density_floor: 0.18
+    density_curve_power: 0.55
+    rest_probability_min: 0.02
+    rest_probability_max: 0.48
+    allow_sixteenths: true
+  velocity:
+    signal: "vitality"
+    min: 35
+    max: 118
+    smoothing_window: 3
+  form:
+    enabled: true
+    sections:
+      - {name: "germination", start_bar: 1, end_bar: 16, density_multiplier: 0.45, velocity_multiplier: 0.72}
+      - {name: "growth", start_bar: 17, end_bar: 40, density_multiplier: 0.90, velocity_multiplier: 1.02}
+      - {name: "bloom", start_bar: 41, end_bar: 60, density_multiplier: 1.90, velocity_multiplier: 1.24}
+      - {name: "settling", start_bar: 61, end_bar: 75, density_multiplier: 0.48, velocity_multiplier: 0.82}
+
+render:
+  enabled: true
+  soundfont: "/usr/share/sounds/sf2/FluidR3_GM.sf2"
+  sample_rate: 44100
+  gain: 2.2

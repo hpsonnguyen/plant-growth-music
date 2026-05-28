@@ -2,258 +2,178 @@
 
 ## Goal
 
-Create a 3-4 minute musical piece from plant growth data by mapping quantified growth features into MIDI events. The piece should use three musical stems, one for each plant batch, and should express plant growth through rhythm, dynamics, pitch, and musical form.
+Create a 3-4 minute musical piece from plant growth data by mapping quantified plant-growth features into MIDI events. The piece uses three musical stems, one for each plant batch, and expresses growth through rhythm, dynamics, register, melodic contour, and formal intensity.
+
+## Current Data Insight
+
+The visualization and metrics show that the plant-derived signals are meaningful but mostly moderate in range. `growth_speed` contains sharp localized spikes, while `growth_mass`, `leaf_energy`, `root_energy`, and `vitality` move more gradually. A literal mapping therefore produces a credible but conservative piece unless the mapping intentionally increases contrast.
+
+Current design response:
+
+- Use `growth_speed` as an event-density trigger, but apply a curve so small changes become audible.
+- Use `vitality` for dynamics with a wider velocity range.
+- Use `root_energy` and `growth_speed` together to trigger occasional dramatic leaps.
+- Use wider stem registers so each batch has a stronger musical identity.
+- Use form multipliers so bloom is clearly louder and denser than germination or settling.
 
 ## Source Data
 
-Use `Greenhouse Plant Growth Metrics.csv` as the primary dataset.
+Primary dataset:
+
+```text
+data/Greenhouse Plant Growth Metrics.csv
+```
 
 The dataset contains:
 
 - `30,000` rows
 - Three plant batches: `R1`, `R2`, `R3`
 - Six experimental classes: `SA`, `SB`, `SC`, `TA`, `TB`, `TC`
-- Numeric growth features such as `PHR`, `ALAP`, `ACHP`, `AWWGV`, `ANPL`, `ARL`, `ARD`, and related root/vegetative measurements
-
-Each plant batch becomes one musical stem:
-
-| Batch | Stem | Suggested Role |
-|---|---|---|
-| `R1` | Stem 1 | Lower/mid melodic body |
-| `R2` | Stem 2 | Mid-register harmonic motion |
-| `R3` | Stem 3 | Upper-register melodic detail |
+- Growth features including `PHR`, `ALAP`, `ACHP`, `AWWGV`, `ANPL`, `ARL`, `ARD`, `ADWR`, `AWWR`, `ADWV`, and `PDMRG`
 
 ## Musical Timeline
 
-Recommended timeline:
+Current timeline:
 
 - Meter: `4/4`
 - Tempo: `90 BPM`
 - Length: `75 bars`
 - Total beats: `300`
-- Target duration: `3 minutes 20 seconds`
+- Duration: `200 seconds`
+- Rows per beat: `100`
 
-This gives a strict duration above 3 minutes while remaining close to the requested 3-4 minute range.
-
-Mapping:
-
-```text
-30,000 rows / 300 beats = 100 rows per beat
-300 beats / 90 BPM = 3.33 minutes
-```
-
-Each beat should represent an aggregation window of approximately `100` rows.
-
-## Data Preprocessing
-
-1. Load the CSV with `pandas`.
-2. Add a global row-sequence index.
-3. Convert row sequence into beat windows.
-4. Group by `beat_index` and `Random` batch.
-5. Aggregate numeric growth features using the mean.
-6. Normalize selected features to `0.0 - 1.0`.
-7. Smooth noisy values with a rolling average.
-8. Compute first differences to estimate growth change and local momentum.
-
-Recommended derived signals:
-
-| Derived Signal | Formula Idea | Musical Use |
-|---|---|---|
-| `growth_mass` | Mean of `AWWGV`, `ADWV`, `AWWR`, `ADWR` | Note duration and body |
-| `leaf_energy` | Mean of `ALAP`, `ANPL`, `ACHP` | Register and brightness |
-| `root_energy` | Mean of `ARL`, `ARD`, `PDMRG` | Grounding and lower movement |
-| `growth_speed` | Difference of smoothed `PHR` or `growth_mass` | Rhythmic density and pitch motion |
-| `vitality` | Weighted blend of `PHR`, `ACHP`, `ALAP` | MIDI velocity and intensity |
-
-## Core Musical Problem
-
-Plant growth data is often monotonic or mostly directional. If absolute growth is mapped directly to pitch, the melody becomes a simple upward line, which is predictable and musically weak.
-
-The solution is to avoid direct absolute-growth-to-pitch mapping. Instead, use a contour-based melodic system.
-
-## Pitch Mapping Strategy
-
-Use plant data to control a melodic contour rather than direct pitch height.
-
-Recommended scale:
+This preserves the dataset row sequence as musical time:
 
 ```text
-D minor pentatonic: D, F, G, A, C
+30,000 rows / 100 rows per beat = 300 beats
+300 beats / 90 BPM = 200 seconds
 ```
 
-This scale is stable, organic, and forgiving when three independent stems overlap.
+## Scale
 
-Alternative scale:
+Current scale:
 
 ```text
 D Dorian: D, E, F, G, A, B, C
 ```
 
-Use D Dorian if more melodic variety is needed.
+D Dorian was chosen over the original minor pentatonic option because it gives the contour walker more melodic color while remaining stable across three independent stems.
 
-### Register Assignment
+## Stem Design
 
-| Stem | Batch | Register |
+| Batch | Stem | Instrument | Register | Role |
+|---|---|---|---|---|
+| `R1` | Stem 1 | Marimba | `C2-D5` | Low/mid body, grounded growth force |
+| `R2` | Stem 2 | Harp | `G3-A5` | Middle connective tissue and harmonic motion |
+| `R3` | Stem 3 | Celesta | `D4-E6` | Upper growth detail and bright activity |
+
+The current design intentionally widens the register of `R1` so the piece has more depth and contrast. `R3` remains bright but has enough room for climactic upper gestures.
+
+## Derived Signals
+
+| Signal | Formula Idea | Musical Role |
 |---|---|---|
-| Stem 1 | `R1` | `D3-C5` |
-| Stem 2 | `R2` | `A3-G5` |
-| Stem 3 | `R3` | `D4-C6` |
+| `growth_mass` | Weighted mean of vegetative/root mass features | Duration, body, direction contour |
+| `leaf_energy` | Weighted mean of `ALAP`, `ANPL`, `ACHP` | Register tendency |
+| `root_energy` | Weighted mean of `ARL`, `ARD`, `PDMRG` | Tension and leap probability |
+| `vitality` | Weighted mean of `PHR`, `ACHP`, `ALAP` | Velocity and intensity |
+| `growth_speed` | Absolute diff of smoothed `growth_mass` | Rhythmic density and motion energy |
 
-### Contour-Based Pitch Walker
+## Pitch Mapping
 
-For each stem:
+The piece uses a contour-based pitch walker rather than direct absolute-growth-to-pitch mapping.
 
-1. Start near a central note in the assigned register.
-2. Use normalized growth level to influence the general register.
-3. Use growth speed to determine motion size.
-4. Use local deviation from a rolling average to determine direction.
-5. Quantize every pitch to the chosen scale.
-6. Clamp notes to the assigned register.
+Current pitch inputs:
 
-Suggested movement rules:
+- Register signal: `leaf_energy`
+- Motion signal: `growth_speed`
+- Direction signal: `growth_mass`
+- Tension signal: `root_energy`
 
-| Growth Behavior | Pitch Behavior |
-|---|---|
-| Low growth speed | Repeat note or move by step |
-| Medium growth speed | Step or small skip |
-| High growth speed | Larger skip or brief leap |
-| Above local average | Bias upward |
-| Below local average | Bias downward |
-| Stable/flat movement | Sustain, repeat, or return toward center |
+Current dramatic behavior:
 
-This keeps the data meaningful while allowing the melody to rise and fall expressively.
+- `max_scale_steps_per_event: 5`
+- `return_to_center_strength: 0.08`
+- `leap_threshold: 0.72`
+- `leap_probability: 0.45`
+- `leap_steps: 4`
 
-## Rhythm Mapping Strategy
+This means normal growth produces stepwise or small-skip motion, while high motion plus high root tension can produce larger expressive leaps. The lower return-to-center strength lets phrases travel farther before resolving.
 
-Use row sequence as the time base, but allow plant activity to shape rhythmic density.
+## Rhythm Mapping
 
-Base grid:
+Rhythm is driven by `growth_speed` with contrast enhancement.
 
-- Quarter notes
-- Eighth notes
-- Occasional sixteenth-note ornaments
+Current rhythm behavior:
 
-Suggested rhythm mapping:
+- `density_signal: growth_speed`
+- `density_floor: 0.18`
+- `density_curve_power: 0.55`
+- `rest_probability_min: 0.02`
+- `rest_probability_max: 0.48`
+- Sixteenth ornaments are allowed.
 
-| Normalized Growth Speed | Rhythm Behavior |
-|---|---|
-| `0.00-0.25` | Half notes, sustained notes, more rests |
-| `0.25-0.50` | Quarter notes |
-| `0.50-0.75` | Eighth notes |
-| `0.75-1.00` | Eighth notes with syncopated sixteenth ornaments |
+The curve power makes low-to-mid `growth_speed` values more audible, while the floor prevents the piece from becoming empty during subtle growth periods.
 
-This makes the music feel as if it accelerates and becomes more active when the plant data is more active.
+## Dynamics Mapping
 
-## Dynamics Mapping Strategy
+Velocity is driven by `vitality`.
 
-Use `vitality` and growth intensity to control MIDI velocity.
-
-Recommended mapping:
+Current velocity range:
 
 ```text
-MIDI velocity = 45 + normalized_vitality * 50
+35-118
 ```
 
-Expected range:
+This wider range replaced the earlier conservative `45-95` range. The result is a more dramatic bloom section while preserving quieter germination and settling sections.
 
-- Quiet: `45`
-- Medium: `70`
-- Strong: `95`
+## Formal Arc
 
-Smooth the velocity curve to prevent jittery dynamics.
+| Section | Bars | Density Multiplier | Velocity Multiplier | Character |
+|---|---:|---:|---:|---|
+| Germination | `1-16` | `0.45` | `0.72` | Sparse, quiet, tentative |
+| Growth | `17-40` | `0.90` | `1.02` | Active but controlled |
+| Bloom | `41-60` | `1.90` | `1.24` | Densest, loudest, most dramatic |
+| Settling | `61-75` | `0.48` | `0.82` | Thinning and quieter |
 
-## Instrumentation
+The form is intentionally more interventionist than the raw data. The data still drives event details, but the form gives the listener a clear musical growth narrative.
 
-Recommended instrument palette:
+## Current Output Diagnostics
 
-| Stem | Suggested Instrument | Musical Function |
-|---|---|---|
-| `R1` | Marimba or kalimba | Warm organic pulse |
-| `R2` | Harp or nylon guitar | Plucked harmonic motion |
-| `R3` | Celesta, bell synth, or flute | Bright upper growth detail |
+After the current dramatic remapping:
 
-Alternative plant-like palette:
+- Duration: `200 seconds`
+- MIDI tracks: tempo/meta track plus three plant stems
+- Event counts: `R1 = 203`, `R2 = 197`, `R3 = 206`
+- Bloom is the loudest section with mean velocity around `96`
+- Germination and settling are much quieter with mean velocity around `49-50`
+- Bloom is the densest section at about `9.7 notes/bar`
+- Each stem has balanced upward and downward pitch motion
+- Large leaps now occur in every stem, including octave-scale gestures
 
-| Stem | Suggested Instrument |
-|---|---|
-| `R1` | Low wood marimba |
-| `R2` | Plucked harp |
-| `R3` | Glassy bell pad |
+## Evaluation Outputs
 
-## Musical Form
+Use these files to evaluate the translation:
 
-Shape the piece into a clear growth arc.
+- `outputs/figures/growth_signals.png`
+- `outputs/figures/piano_roll.png`
+- `outputs/figures/pitch_vs_growth.png`
+- `outputs/figures/velocity_density.png`
+- `outputs/figures/stem_comparison.png`
+- `outputs/metrics.json`
+- `outputs/events/midi_events.csv`
 
-| Section | Bars | Character |
-|---|---:|---|
-| Germination | `1-16` | Sparse notes, low velocity, small intervals |
-| Growth | `17-40` | More density, stronger pulse, wider movement |
-| Bloom | `41-60` | Highest density, strongest dynamics, widest register |
-| Settling | `61-75` | Longer notes, thinning texture, return toward tonal center |
-
-The form can be controlled with a global `form_factor` based on row position.
-
-Examples:
-
-- Early section: reduce note density and velocity.
-- Middle section: allow full rhythmic and melodic movement.
-- Late section: gradually reduce density and pull pitches back toward central scale degrees.
-
-## Feature-To-Music Mapping
-
-| Data Feature | Musical Role |
-|---|---|
-| `PHR` | Growth speed, rhythmic density, phrase momentum |
-| `ALAP` | Register, openness, melodic height tendency |
-| `ACHP` | Brightness, dynamics, articulation strength |
-| `AWWGV` | Note duration, musical weight/body |
-| `ANPL` | Ornaments, repetitions, local activity |
-| `ARL` | Grounding, lower-register tendency |
-| `PDMRG` | Tension, probability of larger intervals |
-
-## Implementation Steps
-
-1. Load and inspect the CSV.
-2. Assign each row to a beat window.
-3. Aggregate each batch per beat.
-4. Normalize, smooth, and derive musical control signals.
-5. Create one MIDI track per batch.
-6. Generate notes using the contour-based pitch walker.
-7. Map growth speed to rhythm and density.
-8. Map vitality to MIDI velocity.
-9. Quantize all notes to the selected scale.
-10. Export the result as a MIDI file.
-11. Export a companion event log showing the data-to-MIDI mapping.
-12. Render the MIDI using chosen instruments in a DAW or a Python audio workflow.
-
-## Validation Checklist
-
-The final piece should satisfy the following:
-
-- Duration is strictly longer than 3 minutes.
-- Duration is close to 3-4 minutes.
-- There are exactly three primary stems.
-- Each stem corresponds to one plant batch.
-- Pitch has meaningful ups and downs.
-- All pitches are quantized to the chosen scale.
-- Growth affects rhythm, dynamics, and pitch behavior.
-- The piece has an audible formal arc.
-- The mapping remains explainable from plant data to music.
-
-## Recommended Starting Configuration
-
-Use this configuration for the first full implementation:
+## Current Recommended Configuration
 
 ```text
 Tempo: 90 BPM
 Meter: 4/4
 Length: 75 bars
-Scale: D minor pentatonic
+Scale: D Dorian
 Rows per beat: 100
-Tracks: 3
-Pitch method: contour-based pitch walker
-Dynamics: normalized vitality to MIDI velocity
-Rhythm: growth speed to density and duration
+Pitch method: contour walker with dramatic leap triggers
+Rhythm: growth_speed with contrast curve and form multipliers
+Dynamics: vitality mapped to velocity 35-118
+Instruments: marimba, harp, celesta
+Rendering: FluidSynth with gain 2.2 when available
 ```
-
-This configuration should produce a musical, organic, and data-driven piece while avoiding the dullness of directly mapping monotonic growth to steadily rising pitch.
