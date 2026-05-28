@@ -141,6 +141,17 @@ accompaniment:
   register_min: "D3"
   register_max: "A5"
   pattern: ["low", "middle", "high", "middle"]
+  repeat_variations:
+    - ["low", "middle", "upper", "middle"]
+    - ["low", "inner", "high", "inner"]
+    - ["middle", "low", "middle", "high"]
+  repeat_variation_after: 1
+  climax_pattern: ["low", "middle", "high", "upper", "high", "middle"]
+  climax_thresholds:
+    vitality: 0.55
+    growth_speed: 0.45
+  climax_step_multiplier: 0.5
+  climax_velocity_multiplier: 1.18
   step_beats:
     germination: 0.5
     growth: 0.25
@@ -154,6 +165,12 @@ accompaniment:
     growth: 0.95
     bloom: 1.08
     settling: 0.78
+
+resolution:
+  enabled: true
+  note: "D3"
+  duration_beats: 4.0
+  velocity: 82
 
 render:
   enabled: true

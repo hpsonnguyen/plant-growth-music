@@ -1,19 +1,21 @@
 {
-  "duration_seconds": 200.0,
+  "duration_seconds": 202.66666666666666,
+  "timeline_duration_seconds": 200.0,
   "events_per_stem": {
-    "ACCOMP": 952,
+    "ACCOMP": 1129,
     "R1": 203,
     "R2": 197,
     "R3": 206
   },
   "events_per_type": {
-    "accompaniment": 952,
-    "melody": 606
+    "accompaniment": 1128,
+    "melody": 606,
+    "resolution": 1
   },
   "pitch_range_per_stem": {
     "ACCOMP": {
       "min": 50,
-      "max": 71
+      "max": 76
     },
     "R1": {
       "min": 36,
@@ -47,15 +49,17 @@
   },
   "melody_chord_tone_fit_rate": 0.9884488448844885,
   "mean_velocity_per_section": {
-    "bloom": 76.187,
+    "bloom": 80.661,
     "germination": 47.174,
     "growth": 63.273,
+    "resolution": 82.0,
     "settling": 44.809
   },
   "notes_per_bar_per_section": {
-    "bloom": 25.7,
+    "bloom": 34.5,
     "germination": 13.625,
     "growth": 24.833,
+    "resolution": 1.0,
     "settling": 15.333
   },
   "correlations": {

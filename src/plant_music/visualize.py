@@ -135,7 +135,7 @@ def _plot_harmony_timeline(plt, figures, harmony_plan: pd.DataFrame) -> None:
 
 
 def _plot_chord_piano_roll(plt, figures, events: pd.DataFrame) -> None:
-    colors = {"accompaniment": "#2a9d8f", "bass": "#264653", "arpeggio": "#2a9d8f", "melody": "#e76f51"}
+    colors = {"accompaniment": "#2a9d8f", "bass": "#264653", "arpeggio": "#2a9d8f", "melody": "#e76f51", "resolution": "#1d3557"}
     fig, ax = plt.subplots(figsize=(14, 7))
     for event_type, group in events.groupby("event_type"):
         ax.scatter(group["beat_start"], group["pitch_midi"], s=np.maximum(6, group["velocity"] / 4), alpha=0.62, label=event_type, color=colors.get(event_type, "#666666"))
@@ -177,6 +177,7 @@ def _safe_corr(a: pd.Series, b: pd.Series) -> float | None:
 def _write_metrics(config: dict, features: pd.DataFrame, events: pd.DataFrame) -> None:
     bpm = int(config["timeline"]["bpm"])
     total_beats = int(config["timeline"]["bars"]) * int(config["timeline"]["beats_per_bar"])
+    event_end_beat = float((events["beat_start"] + events["beat_duration"]).max()) if not events.empty else total_beats
     density = events.groupby(["batch", "bar_index"]).size().reset_index(name="notes_per_bar")
     feature_bar = features.groupby(["Random", "bar_index"], as_index=False).agg({"growth_speed": "mean", "vitality": "mean", "leaf_energy": "mean"})
     event_bar = events.groupby(["batch", "bar_index"], as_index=False).agg({"velocity": "mean", "pitch_midi": "mean"})
@@ -196,7 +197,8 @@ def _write_metrics(config: dict, features: pd.DataFrame, events: pd.DataFrame) -
         chord_fit = float(melody_events["is_chord_tone"].astype(bool).mean())
 
     metrics = {
-        "duration_seconds": total_beats * 60 / bpm,
+        "duration_seconds": event_end_beat * 60 / bpm,
+        "timeline_duration_seconds": total_beats * 60 / bpm,
         "events_per_stem": events.groupby("batch").size().to_dict(),
         "events_per_type": events.groupby("event_type").size().to_dict() if "event_type" in events.columns else {},
         "pitch_range_per_stem": events.groupby("batch")["pitch_midi"].agg(["min", "max"]).to_dict("index"),

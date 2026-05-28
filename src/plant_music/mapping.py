@@ -108,6 +108,8 @@ def apply_harmony_and_arpeggios(config: dict, features: pd.DataFrame, melody_eve
         layers.append(_generate_broken_chord_accompaniment(config, harmony_plan))
     if config.get("arpeggio", {}).get("enabled", False):
         layers.append(_generate_arpeggios(config, features, harmony_plan))
+    if config.get("resolution", {}).get("enabled", False):
+        layers.append(_generate_resolution_event(config, harmony_plan))
     return _finalize_events(pd.concat(layers, ignore_index=True))
 
 
@@ -208,13 +210,20 @@ def _generate_arpeggios(config: dict, features: pd.DataFrame, harmony_plan: pd.D
 def _generate_broken_chord_accompaniment(config: dict, harmony_plan: pd.DataFrame) -> pd.DataFrame:
     accompaniment_cfg = config["accompaniment"]
     events = []
-    pattern = accompaniment_cfg.get("pattern", ["low", "middle", "high", "middle"])
     low = note_to_midi(accompaniment_cfg["register_min"])
     high = note_to_midi(accompaniment_cfg["register_max"])
+    previous_chord = None
+    repeat_count = 0
     for _, chord_row in harmony_plan.iterrows():
         chord = _chord_dict(chord_row)
+        if chord["chord_symbol"] == previous_chord:
+            repeat_count += 1
+        else:
+            repeat_count = 0
+            previous_chord = chord["chord_symbol"]
         section_name = chord["section"]
-        step = float(accompaniment_cfg.get("step_beats", {}).get(section_name, 0.5))
+        pattern, is_climax = _select_accompaniment_pattern(config, chord, repeat_count)
+        step = _accompaniment_step(config, chord, is_climax)
         duration = step * float(accompaniment_cfg.get("duration_ratio", 0.94))
         beat_start = float(chord["beat_start"])
         idx = 0
@@ -222,7 +231,7 @@ def _generate_broken_chord_accompaniment(config: dict, harmony_plan: pd.DataFram
         while beat_start < float(chord["beat_end"]) - 1e-6:
             role = pattern[idx % len(pattern)]
             pitch = tones[role]
-            velocity = _accompaniment_velocity(config, chord)
+            velocity = _accompaniment_velocity(config, chord, is_climax=is_climax)
             events.append(_event_record(
                 config=config,
                 batch="ACCOMP",
@@ -250,6 +259,79 @@ def _generate_broken_chord_accompaniment(config: dict, harmony_plan: pd.DataFram
     return pd.DataFrame(events)
 
 
+def _select_accompaniment_pattern(config: dict, chord: dict[str, Any], repeat_count: int) -> tuple[list[str], bool]:
+    cfg = config["accompaniment"]
+    if _is_climax_accompaniment(config, chord):
+        return cfg.get("climax_pattern", cfg.get("pattern", ["low", "middle", "high", "middle"])), True
+    repeat_after = int(cfg.get("repeat_variation_after", 1))
+    variations = cfg.get("repeat_variations", [])
+    if variations and repeat_count >= repeat_after:
+        return variations[(repeat_count - repeat_after) % len(variations)], False
+    return cfg.get("pattern", ["low", "middle", "high", "middle"]), False
+
+
+def _is_climax_accompaniment(config: dict, chord: dict[str, Any]) -> bool:
+    cfg = config["accompaniment"]
+    thresholds = cfg.get("climax_thresholds", {})
+    vitality_threshold = float(thresholds.get("vitality", 1.1))
+    speed_threshold = float(thresholds.get("growth_speed", 1.1))
+    return chord.get("section") == "bloom" and (
+        float(chord.get("vitality", 0.0)) >= vitality_threshold
+        or float(chord.get("growth_speed", 0.0)) >= speed_threshold
+    )
+
+
+def _accompaniment_step(config: dict, chord: dict[str, Any], is_climax: bool) -> float:
+    cfg = config["accompaniment"]
+    section_name = chord["section"]
+    step = float(cfg.get("step_beats", {}).get(section_name, 0.5))
+    if is_climax:
+        step *= float(cfg.get("climax_step_multiplier", 1.0))
+    return max(0.0625, step)
+
+
+def _generate_resolution_event(config: dict, harmony_plan: pd.DataFrame) -> pd.DataFrame:
+    cfg = config["resolution"]
+    bars = int(config["timeline"]["bars"])
+    beats_per_bar = int(config["timeline"]["beats_per_bar"])
+    beat_start = float(bars * beats_per_bar)
+    note = cfg.get("note", f"{config['scale']['root']}3")
+    pitch = note_to_midi(note)
+    last_chord = _chord_dict(harmony_plan.iloc[-1])
+    row = pd.Series({
+        "bar_index": bars + 1,
+        "source_row_start": 0,
+        "source_row_end": 0,
+        "growth_mass": float(last_chord.get("growth_mass", 0.0)),
+        "leaf_energy": float(last_chord.get("leaf_energy", 0.0)),
+        "root_energy": float(last_chord.get("root_energy", 0.0)),
+        "vitality": float(last_chord.get("vitality", 0.0)),
+        "growth_speed": float(last_chord.get("growth_speed", 0.0)),
+    })
+    return pd.DataFrame([_event_record(
+        config=config,
+        batch="ACCOMP",
+        row=row,
+        beat_start=beat_start,
+        beat_duration=float(cfg.get("duration_beats", 4.0)),
+        pitch=int(pitch),
+        velocity=int(cfg.get("velocity", 82)),
+        event_type="resolution",
+        section_name="resolution",
+        register_value=float(row.get("leaf_energy", 0.0)),
+        motion_value=float(row.get("growth_speed", 0.0)),
+        direction_value=float(row.get("growth_mass", 0.0)),
+        local_average=float(row.get("growth_mass", 0.0)),
+        direction=0,
+        step_size=0,
+        tension_value=float(row.get("root_energy", 0.0)),
+        chord=last_chord,
+        original_pitch=int(pitch),
+        pitch_adjustment=0,
+        chord_tone="tonic_resolution",
+    )])
+
+
 def _broken_chord_tones(chord: dict[str, Any], low: int, high: int) -> dict[str, int]:
     roles = chord.get("chord_roles", {})
     root = int(roles.get("root", chord["chord_pitch_classes"][0]))
@@ -261,8 +343,10 @@ def _broken_chord_tones(chord: dict[str, Any], low: int, high: int) -> dict[str,
     high_candidates = [fifth, high_color, third]
     return {
         "low": _nearest_pitch_for_pitch_classes(low_candidates, low + 0.04 * (high - low), low, high),
+        "inner": _nearest_pitch_for_pitch_classes(middle_candidates, low + 0.34 * (high - low), low, high),
         "middle": _nearest_pitch_for_pitch_classes(middle_candidates, low + 0.45 * (high - low), low, high),
         "high": _nearest_pitch_for_pitch_classes(high_candidates, low + 0.62 * (high - low), low, high),
+        "upper": _nearest_pitch_for_pitch_classes(high_candidates, low + 0.78 * (high - low), low, high),
     }
 
 
@@ -273,11 +357,13 @@ def _nearest_pitch_for_pitch_classes(pitch_classes: list[int], target: float, lo
     return min(candidates, key=lambda pitch: abs(pitch - target))
 
 
-def _accompaniment_velocity(config: dict, chord: dict[str, Any]) -> int:
+def _accompaniment_velocity(config: dict, chord: dict[str, Any], is_climax: bool = False) -> int:
     cfg = config["accompaniment"]
     vitality = float(chord.get("vitality", 0.0))
     velocity = float(cfg.get("velocity_min", 42)) + vitality * (float(cfg.get("velocity_max", 76)) - float(cfg.get("velocity_min", 42)))
     velocity *= float(cfg.get("section_velocity_multiplier", {}).get(chord.get("section", ""), 1.0))
+    if is_climax:
+        velocity *= float(cfg.get("climax_velocity_multiplier", 1.0))
     return int(max(1, min(127, round(velocity))))
 
 
@@ -465,7 +551,7 @@ def _nearest_pitch_for_pcs(notes: list[int], pitch: int, pcs: list[int]) -> int:
 def _finalize_events(events: pd.DataFrame) -> pd.DataFrame:
     if events.empty:
         return events
-    order = {"bass": 0, "accompaniment": 1, "arpeggio": 1, "melody": 2}
+    order = {"bass": 0, "accompaniment": 1, "arpeggio": 1, "melody": 2, "resolution": 3}
     events = events.copy()
     events["_event_order"] = events["event_type"].map(order).fillna(9)
     events = events.sort_values(["beat_start", "_event_order", "batch", "pitch_midi"]).drop(columns=["_event_order"]).reset_index(drop=True)
