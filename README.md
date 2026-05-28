@@ -34,6 +34,12 @@ data/Greenhouse Plant Growth Metrics.csv
 
 This [Kaggle](https://www.kaggle.com/datasets/adilshamim8/greenhouse-plant-growth-metrics) dataset contains `30,000` rows of plant growth measurements across three batches:
 
+For a brief dataset summary and exploratory analysis, see:
+
+```text
+data/greenhouse_plant_growth_eda.ipynb
+```
+
 | Batch | Musical Stem |
 |---|---|
 | `R1` | Marimba stem |
@@ -109,7 +115,7 @@ The data drives local details, but the overall piece is shaped into a growth nar
 
 This formal layer makes the piece easier to hear as music while still preserving plant-data influence inside each section.
 
-## Interpreting The Result
+## Result Interpretation
 
 The resulting piece should sound like a gradual biological process becoming musical: sparse early gestures, increased activity through the growth section, a louder and denser bloom, then a settling phase.
 
@@ -188,6 +194,14 @@ Important interpretation:
 - They share the same scale and formal structure, but each batch produces different pitch ranges, densities, and velocity profiles.
 
 ## Run The Project
+
+For best audio rendering, install FluidSynth and use a GM-compatible SoundFont. On Ubuntu/Debian, this is typically:
+
+```bash
+sudo apt install fluidsynth fluid-soundfont-gm
+```
+
+If FluidSynth or the configured SoundFont is unavailable, the project still runs and renders a simple fallback WAV demo from the generated MIDI events.
 
 Generate MIDI, audio, figures, event logs, and metrics:
 
