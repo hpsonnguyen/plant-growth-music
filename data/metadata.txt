@@ -1,0 +1,15 @@
+Column	Description	Type
+Random	Sample batch ID (e.g., R1, R2, R3)	String
+ACHP	Average chlorophyll content (photosynthetic pigment)	Float
+PHR	Plant height growth rate	Float
+AWWGV	Average wet weight of vegetative growth	Float
+ALAP	Average leaf area per plant	Float
+ANPL	Average number of leaves per plant	Float
+ARD	Average root diameter	Float
+ADWR	Average dry weight of roots	Float
+PDMVG	% dry matter in vegetative growth	Float
+ARL	Average root length	Float
+AWWR	Average wet weight of roots	Float
+ADWV	Average dry weight of vegetative parts	Float
+PDMRG	% dry matter in root growth	Float
+Class	Experimental group label (SA, SB, SC, TA, TB, TC)	Categorical
