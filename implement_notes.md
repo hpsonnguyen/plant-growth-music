@@ -34,6 +34,7 @@ outputs/processed/beat_features.csv
 outputs/metrics.json
 outputs/figures/growth_to_intensity.png
 outputs/figures/leaf_to_register.png
+outputs/figures/melody_contour_mapping.png
 ```
 
 ## Pipeline
@@ -115,6 +116,7 @@ The final visualization set is intentionally small. Each figure pairs a data-sid
 |---|---|
 | `growth_to_intensity.png` | Per-batch `growth_speed`/`vitality` to same-batch melody density/velocity |
 | `leaf_to_register.png` | Per-batch `leaf_energy` to same-batch melodic register |
+| `melody_contour_mapping.png` | Per-batch melody contour with register target, direction, and generated step size |
 
 These are presentation figures, not exhaustive debugging plots.
 

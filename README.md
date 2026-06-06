@@ -13,6 +13,7 @@ outputs/audio/plant_music_demo.wav
 outputs/midi/plant_music_full.mid
 outputs/figures/growth_to_intensity.png
 outputs/figures/leaf_to_register.png
+outputs/figures/melody_contour_mapping.png
 ```
 
 The isolated MIDI stems are also exported:
@@ -111,6 +112,12 @@ For each batch, `growth_speed` and `vitality` are shown beside that batch's melo
 ![Leaf to register](outputs/figures/leaf_to_register.png)
 
 For each batch, leaf-related energy is shown beside that same batch's melody register. The figure shows how leaf growth helps open the pitch field without mixing the batches together.
+
+### Melody Contour Mapping
+
+![Melody contour mapping](outputs/figures/melody_contour_mapping.png)
+
+This shows how the melody itself is built: `leaf_energy` pulls register, `growth_mass` sets contour direction, and generated scale-step size controls how far each event moves.
 
 ## Current Output Snapshot
 

@@ -6,11 +6,13 @@ import numpy as np
 import pandas as pd
 
 from .config import output_path
+from .scales import note_to_midi
 
 
 SHOWCASE_FIGURES = {
     "growth_to_intensity.png",
     "leaf_to_register.png",
+    "melody_contour_mapping.png",
 }
 
 BATCH_COLORS = {"R1": "#355c7d", "R2": "#2a9d8f", "R3": "#e76f51"}
@@ -35,6 +37,7 @@ def make_visualizations(config: dict, features: pd.DataFrame, events: pd.DataFra
         _set_style(plt)
         _plot_growth_to_intensity(plt, figures, features, events)
         _plot_leaf_to_register(plt, figures, features, events)
+        _plot_melody_contour_mapping(plt, figures, features, events, config)
     _write_metrics(config, features, events)
 
 
@@ -142,6 +145,52 @@ def _plot_leaf_to_register(plt, figures, features: pd.DataFrame, events: pd.Data
     _shade_sections(config=None, axes=axes)
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(figures / "leaf_to_register.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_melody_contour_mapping(plt, figures, features: pd.DataFrame, events: pd.DataFrame, config: dict) -> None:
+    melody = events[events["event_type"] == "melody"].copy()
+    batches = sorted(features["Random"].unique())
+    fig, axes = plt.subplots(len(batches), 1, figsize=(16, 9), sharex=True)
+    fig.suptitle("Melody Contour Mapping", fontsize=18, fontweight="bold", y=1.01)
+    fig.text(
+        0.5,
+        0.965,
+        "Line: generated melody. Pale curve: leaf_energy target register. Color: growth_mass direction. Size: generated scale-step distance.",
+        ha="center",
+        fontsize=11,
+        color="#4b4640",
+    )
+
+    for row_index, batch in enumerate(batches):
+        color = BATCH_COLORS.get(batch, "#355c7d")
+        stem = config["stems"][batch]
+        min_pitch = note_to_midi(stem["register_min"])
+        max_pitch = note_to_midi(stem["register_max"])
+        batch_features = _batch_bar_features(features, batch, ["leaf_energy"])
+        batch_features["target_pitch"] = min_pitch + batch_features["leaf_energy"] * (max_pitch - min_pitch)
+        batch_melody = melody[melody["batch"] == batch].sort_values("beat_start")
+        ax = axes[row_index]
+
+        up = batch_melody[batch_melody["direction"] > 0]
+        down = batch_melody[batch_melody["direction"] < 0]
+        sizes = 14 + batch_melody["scale_steps"].clip(1, 10) * 5
+
+        ax.plot(batch_melody["beat_start"] / 4 + 1, batch_melody["pitch_midi"], color="#1d3557", linewidth=1.4, alpha=0.82, label="melody contour")
+        ax.plot(batch_features["bar_index"], batch_features["target_pitch"], color=color, linewidth=2.4, alpha=0.28, label="leaf_energy register target")
+        ax.scatter(up["beat_start"] / 4 + 1, up["pitch_midi"], s=sizes.loc[up.index], color=color, alpha=0.58, edgecolors="white", linewidths=0.35, label="growth_mass above local average")
+        ax.scatter(down["beat_start"] / 4 + 1, down["pitch_midi"], s=sizes.loc[down.index], color="#9b5f2e", alpha=0.50, edgecolors="white", linewidths=0.35, label="growth_mass below local average")
+        ax.set_ylabel(f"{batch}\nMIDI pitch")
+        ax.set_ylim(min_pitch - 3, max_pitch + 3)
+        ax.grid(True, linewidth=0.8)
+        if row_index == 0:
+            ax.set_title("Contour walker: register target, direction, and step size in one melody line")
+            ax.legend(frameon=False, loc="upper left", ncol=2)
+
+    axes[-1].set_xlabel("Bar")
+    _shade_sections(config=None, axes=axes)
+    fig.tight_layout(rect=(0, 0, 1, 0.94))
+    fig.savefig(figures / "melody_contour_mapping.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
 
 

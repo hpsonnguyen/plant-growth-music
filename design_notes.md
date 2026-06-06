@@ -38,19 +38,55 @@ The raw columns are grouped by what they describe biologically before they are u
 
 The important distinction is between amount and change. `growth_mass` tells the system where the plant has arrived. `growth_speed` tells it that something is currently changing. That is why `growth_speed` controls activity while `growth_mass` contributes to phrase shape.
 
-## Why Pitch Is A Contour, Not A Direct Graph
+## Melody Generation
 
-The pitch generator is a contour walker. It keeps a current pitch, then moves up, down, or stays close depending on the data.
+The melody is generated before accompaniment. Each batch is processed independently, so `R1`, `R2`, and `R3` each become their own melodic line.
 
-This choice comes from looking at the kind of data we have. Growth measurements are often directional or slowly varying. A literal mapping from growth to pitch would overstate long-term accumulation and understate local changes. The contour walker instead asks three smaller musical questions:
+The generator does not convert one plant value directly into one note. It uses the plant features to answer four separate questions at every beat:
 
-| Mapping Question | Data Signal |
-|---|---|
-| Should the line tend upward or downward? | `growth_mass` compared with its local average |
-| How large should the next move be? | mostly `growth_speed`, with some `root_energy` |
-| Where should the line sit in the register? | `leaf_energy` |
+| Question | Data Used | Musical Result |
+|---|---|---|
+| Does this beat produce a note? | `growth_speed` plus section density | rest or melody event |
+| Should the contour move up or down? | `growth_mass` compared to a 9-beat local average | direction `+1` or `-1` |
+| How far should it move? | `0.65 * growth_speed + 0.35 * root_energy` | scale-step distance |
+| Where should the line be pulled in register? | `leaf_energy` | drift toward lower or higher part of the batch register |
+| How strong should the note be? | `vitality` plus section velocity | MIDI velocity |
 
-This produces melodic motion without losing the plant signal. The generated melody can rise, fall, pause, and return, while still being constrained by the measured growth behavior.
+This separation matters because the dataset mixes accumulated size and local change. `growth_mass` is useful for direction because it gives the contour a long-term tendency. `growth_speed` is useful for density and motion because it reacts to recent change. `leaf_energy` is useful for register because leaf area, leaf count, and chlorophyll describe the visible upper structure of the plant.
+
+The melody algorithm for one batch is:
+
+1. Build the legal pitch set from the configured register and `D Dorian` scale.
+2. Start at the configured center note for the batch.
+3. For each beat, calculate density as `max(0.18, growth_speed^0.55) * section_density_multiplier`, clipped to `0-1`.
+4. If an event is produced, compare `growth_mass` to its local rolling average. If it is above average, the contour moves upward; otherwise it moves downward.
+5. Calculate step size with `1 + round((0.65 * growth_speed + 0.35 * root_energy) * max_steps)`. The default `max_steps` is `5`.
+6. If `0.55 * growth_speed + 0.45 * root_energy` crosses the leap threshold, a probabilistic extra leap can add `4` scale steps.
+7. Convert `leaf_energy` into a target location inside the batch register. The melody takes a one-step drift toward that target, so register changes influence the line without instantly snapping it to a graph.
+8. Apply a small probabilistic pull back toward the batch center note. This prevents the contour from sticking at the top or bottom of the register after large moves.
+9. Clamp the result to the batch register.
+10. Calculate velocity from `vitality` over the configured MIDI range `35-118`, then apply the section velocity multiplier.
+11. Emit the melody event with pitch, beat position, duration, velocity, and the source signal values used to create it.
+
+The rhythm gate uses the same density value. The rest probability is high when `growth_speed` is low and falls as density rises:
+
+```text
+rest_probability = 0.48 - density * (0.48 - 0.02)
+```
+
+Density also controls how many possible note starts exist within a beat. Low density allows only the main beat. Medium density can add the half-beat. High density can add a sixteenth-position pickup at `0.75` beats. This is why active growth produces not only louder notes, but more rhythmic surface.
+
+Durations are shortened as density increases. Sparse areas can sustain for about a beat or more; dense areas use shorter notes so the texture does not blur. This keeps the rhythmic mapping audible instead of turning high-growth passages into overlapping sustained tones.
+
+After this data-driven contour is generated, harmony correction adjusts some pitches to nearby active chord tones, especially on strong beats. The original generated pitch and the adjustment are both kept in `outputs/events/midi_events.csv` as `original_pitch_midi` and `pitch_adjustment`. This means the melody remains data-shaped, but it is not left harmonically arbitrary.
+
+The contour visualization makes this process inspectable:
+
+```text
+outputs/figures/melody_contour_mapping.png
+```
+
+In that figure, the dark line is the generated melody contour, the pale line is the `leaf_energy` register target, point color shows whether `growth_mass` is above or below its local average, and point size shows the generated scale-step distance.
 
 ## Batch Identity
 
